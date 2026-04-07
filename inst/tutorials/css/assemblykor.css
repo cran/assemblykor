@@ -1,0 +1,662 @@
+/* assemblykor tutorial theme - dark mode */
+
+/* ── Import fonts ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Root variables ── */
+:root {
+  --ak-bg: #161b22;
+  --ak-surface: #1c2128;
+  --ak-surface-raised: #242a33;
+  --ak-border: #30363d;
+  --ak-border-light: #3a424b;
+  --ak-text: #e6edf3;
+  --ak-text-secondary: #8b949e;
+  --ak-text-muted: #6e7681;
+  --ak-accent: #58a6ff;
+  --ak-accent-dim: rgba(88, 166, 255, 0.15);
+  --ak-green: #3fb950;
+  --ak-green-dim: rgba(63, 185, 80, 0.15);
+  --ak-code-bg: #0d1117;
+  --ak-code-text: #cdd6f4;
+  --ak-sidebar-bg: #0d1117;
+  --ak-radius: 8px;
+  --ak-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Global ── */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ak-text);
+  background: var(--ak-bg) !important;
+  line-height: 1.7;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Sidebar ── */
+.band {
+  background: var(--ak-sidebar-bg) !important;
+}
+
+.bandContent {
+  background: var(--ak-sidebar-bg) !important;
+}
+
+.bandContent .topicsList {
+  background: var(--ak-sidebar-bg) !important;
+}
+
+.topicsList .topic {
+  border-bottom-color: var(--ak-border) !important;
+}
+
+.topicsList .topic.current {
+  background: rgba(88, 166, 255, 0.1) !important;
+  border-left: 3px solid var(--ak-accent) !important;
+}
+
+.topicsList .topic .title {
+  color: var(--ak-text-secondary) !important;
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.topicsList .topic.current .title {
+  color: var(--ak-accent) !important;
+  font-weight: 600;
+}
+
+#tutorial-topic .bandContent h2,
+.tutorialTitle {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 700 !important;
+  color: var(--ak-text) !important;
+  letter-spacing: -0.02em;
+}
+
+/* ── Main content area ── */
+.topicContent {
+  background: var(--ak-bg) !important;
+  padding: 2rem 2.5rem !important;
+  max-width: 850px;
+}
+
+/* Override Bootstrap/learnr panel backgrounds */
+.container-fluid,
+.row,
+.col-sm-12,
+.col-sm-8,
+.col-sm-4 {
+  background: transparent !important;
+}
+
+/* ── Typography ── */
+h2, h3, h4 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  color: var(--ak-text) !important;
+  letter-spacing: -0.02em;
+}
+
+.section h2 {
+  font-size: 1.6rem;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--ak-accent);
+  display: inline-block;
+}
+
+.section h3 {
+  font-size: 1.2rem;
+  margin-top: 2rem;
+  color: var(--ak-text) !important;
+}
+
+p, li {
+  color: var(--ak-text) !important;
+  margin-bottom: 1rem;
+}
+
+a {
+  color: var(--ak-accent) !important;
+}
+
+a:hover {
+  color: #79c0ff !important;
+}
+
+/* ── Code blocks (non-exercise) ── */
+pre {
+  background: var(--ak-code-bg) !important;
+  color: var(--ak-code-text) !important;
+  border: 1px solid var(--ak-border) !important;
+  border-radius: var(--ak-radius) !important;
+  padding: 1rem 1.2rem !important;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  font-variant-ligatures: none !important;
+  box-shadow: none !important;
+  overflow-x: auto;
+}
+
+pre code {
+  background: transparent !important;
+  color: var(--ak-code-text) !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-variant-ligatures: none !important;
+  padding: 0 !important;
+}
+
+/* Inline code */
+code {
+  background: var(--ak-surface-raised);
+  color: #f97583;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.88em;
+  font-variant-ligatures: none;
+  font-weight: 500;
+  border: 1px solid var(--ak-border);
+}
+
+/* ── Exercise containers ── */
+.tutorial-exercise {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  border-radius: var(--ak-radius) !important;
+  box-shadow: var(--ak-shadow) !important;
+  margin: 1.5rem 0 !important;
+  overflow: visible;
+}
+
+.tutorial-exercise .ace_editor {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  font-variant-ligatures: none !important;
+  border-radius: var(--ak-radius) var(--ak-radius) 0 0 !important;
+}
+
+/* Exercise toolbar */
+.tutorial-exercise-actions {
+  background: var(--ak-surface-raised) !important;
+  border-top: 1px solid var(--ak-border) !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
+.btn-tutorial-run {
+  background: #238636 !important;
+  border: 1px solid #2ea043 !important;
+  color: white !important;
+  border-radius: 6px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 12.5px !important;
+  padding: 6px 16px !important;
+  letter-spacing: 0.02em;
+  transition: background 0.15s ease;
+}
+
+.btn-tutorial-run:hover {
+  background: #2ea043 !important;
+}
+
+/* Hint and solution buttons */
+.btn-tutorial-hint,
+.btn-tutorial-solution,
+.btn-tutorial-copy {
+  border-radius: 6px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  border: 1px solid var(--ak-border) !important;
+  background: var(--ak-surface) !important;
+  color: var(--ak-text-secondary) !important;
+  transition: all 0.15s ease;
+}
+
+.btn-tutorial-hint:hover,
+.btn-tutorial-solution:hover,
+.btn-tutorial-copy:hover {
+  background: var(--ak-surface-raised) !important;
+  color: var(--ak-text) !important;
+  border-color: var(--ak-border-light) !important;
+}
+
+/* Exercise output */
+.tutorial-exercise-output {
+  border-top: 1px solid var(--ak-border);
+  background: var(--ak-code-bg) !important;
+}
+
+.tutorial-exercise-output pre {
+  background: var(--ak-code-bg) !important;
+  color: var(--ak-code-text) !important;
+  box-shadow: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  font-size: 13px !important;
+}
+
+/* ── Quiz styling ── */
+.tutorial-question {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  border-left: 4px solid var(--ak-accent) !important;
+  border-radius: var(--ak-radius) !important;
+  padding: 1.25rem 1.5rem !important;
+  margin: 1.5rem 0 !important;
+  box-shadow: var(--ak-shadow) !important;
+}
+
+.tutorial-question-container {
+  margin: 0 !important;
+}
+
+.tutorial-question h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ak-accent) !important;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.tutorial-question .btn-primary {
+  background: #238636 !important;
+  border: 1px solid #2ea043 !important;
+  border-radius: 6px !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  padding: 6px 20px !important;
+  transition: background 0.15s ease;
+}
+
+.tutorial-question .btn-primary:hover {
+  background: #2ea043 !important;
+}
+
+/* Correct answer */
+.tutorial-question .correct {
+  color: var(--ak-green) !important;
+  background: var(--ak-green-dim) !important;
+  border: 1px solid rgba(63, 185, 80, 0.3) !important;
+  border-radius: 6px !important;
+  padding: 0.75rem 1rem !important;
+  margin-top: 0.75rem;
+  font-weight: 500;
+}
+
+/* Radio/checkbox styling */
+.tutorial-question .radio label,
+.tutorial-question .checkbox label {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  padding: 0.4rem 0;
+  cursor: pointer;
+  color: var(--ak-text) !important;
+}
+
+/* ── Section dividers ── */
+.section-heading {
+  border-bottom: none;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--ak-border);
+  margin: 2.5rem 0;
+}
+
+/* ── Data frame / table output ── */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  font-size: 13.5px;
+  border-radius: var(--ak-radius);
+  overflow: hidden;
+  border: 1px solid var(--ak-border);
+}
+
+thead th {
+  background: var(--ak-code-bg);
+  color: var(--ak-text);
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: none;
+  border-bottom: 1px solid var(--ak-border);
+}
+
+tbody td {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--ak-border);
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-ligatures: none;
+  font-size: 13px;
+  color: var(--ak-text);
+  background: var(--ak-surface);
+}
+
+tbody tr:hover td {
+  background: var(--ak-accent-dim);
+}
+
+tbody tr:nth-child(even) td {
+  background: var(--ak-surface-raised);
+}
+
+tbody tr:nth-child(even):hover td {
+  background: var(--ak-accent-dim);
+}
+
+/* Paged table (learnr default) */
+.pagedtable {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  border-radius: var(--ak-radius) !important;
+}
+
+.pagedtable-wrapper {
+  background: var(--ak-surface) !important;
+  border: none !important;
+}
+
+.pagedtable-header-name,
+.pagedtable-header-type {
+  color: var(--ak-text-secondary) !important;
+}
+
+.pagedtable-not-empty .pagedtable-footer {
+  background: var(--ak-surface-raised) !important;
+  border-top: 1px solid var(--ak-border) !important;
+  color: var(--ak-text-muted) !important;
+}
+
+.pagedtable-footer-info {
+  color: var(--ak-text-muted) !important;
+}
+
+/* ── Progress bar ── */
+.progress {
+  background: var(--ak-border) !important;
+  border-radius: 4px !important;
+  height: 4px !important;
+}
+
+.progress-bar {
+  background: var(--ak-accent) !important;
+  border-radius: 4px !important;
+}
+
+/* ── Navbar override ── */
+.navbar {
+  background: var(--ak-sidebar-bg) !important;
+  border-bottom: 1px solid var(--ak-border) !important;
+}
+
+.navbar-brand,
+.navbar-text {
+  color: var(--ak-text) !important;
+}
+
+/* ── Bootstrap panel/well overrides ── */
+.well {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  box-shadow: none !important;
+}
+
+.panel {
+  background: var(--ak-surface) !important;
+  border-color: var(--ak-border) !important;
+}
+
+.panel-heading {
+  background: var(--ak-surface-raised) !important;
+  border-color: var(--ak-border) !important;
+  color: var(--ak-text) !important;
+}
+
+.panel-body {
+  background: var(--ak-surface) !important;
+  color: var(--ak-text) !important;
+}
+
+/* ── Subtitle ── */
+.subtitle,
+h2.subtitle {
+  color: var(--ak-text-secondary) !important;
+  font-size: 0.95rem !important;
+  font-weight: 400 !important;
+  margin-top: -0.5rem !important;
+  letter-spacing: 0 !important;
+}
+
+h2.subtitle em {
+  color: var(--ak-text-secondary) !important;
+  font-style: normal;
+}
+
+/* ── Scrollbar (WebKit) ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--ak-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ak-border-light);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ak-text-muted);
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .topicContent {
+    padding: 1rem 1.2rem !important;
+  }
+
+  .section h2 {
+    font-size: 1.3rem;
+  }
+}
+
+/* ── Ace editor theme (Catppuccin Mocha) ── */
+.tutorial-exercise .ace_scroller {
+  background: var(--ak-code-bg) !important;
+}
+
+.tutorial-exercise .ace_gutter {
+  background: #0d1117 !important;
+  color: var(--ak-text-muted) !important;
+  border-right: 1px solid var(--ak-border) !important;
+}
+
+.tutorial-exercise .ace_gutter-active-line {
+  background: var(--ak-surface) !important;
+}
+
+.tutorial-exercise .ace_cursor {
+  color: var(--ak-text) !important;
+}
+
+.tutorial-exercise .ace_marker-layer .ace_active-line {
+  background: rgba(205, 214, 244, 0.05) !important;
+}
+
+.tutorial-exercise .ace_text-layer {
+  color: var(--ak-code-text) !important;
+}
+
+.tutorial-exercise .ace_keyword {
+  color: #cba6f7 !important;
+}
+
+.tutorial-exercise .ace_constant,
+.tutorial-exercise .ace_constant.ace_numeric {
+  color: #fab387 !important;
+}
+
+.tutorial-exercise .ace_string {
+  color: #a6e3a1 !important;
+}
+
+.tutorial-exercise .ace_comment {
+  color: #6c7086 !important;
+  font-style: italic;
+}
+
+.tutorial-exercise .ace_variable {
+  color: #cdd6f4 !important;
+}
+
+.tutorial-exercise .ace_support.ace_function {
+  color: #89b4fa !important;
+}
+
+.tutorial-exercise .ace_paren {
+  color: #f5e0dc !important;
+}
+
+.tutorial-exercise .ace_operator {
+  color: #89dceb !important;
+}
+
+/* ── Solution / Hint panels ── */
+.tutorial-exercise-support {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  border-radius: var(--ak-radius) !important;
+  margin-top: 0.5rem !important;
+}
+
+.tutorial-exercise-support pre {
+  background: var(--ak-code-bg) !important;
+  color: var(--ak-code-text) !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+.tutorial-exercise-support pre code {
+  background: transparent !important;
+  color: var(--ak-code-text) !important;
+}
+
+/* Solution/hint popover panel */
+.popover {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  border-radius: var(--ak-radius) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  max-width: 700px !important;
+  min-width: 400px !important;
+  z-index: 1060 !important;
+  pointer-events: auto !important;
+}
+
+.popover-title {
+  background: var(--ak-surface-raised) !important;
+  border-bottom: 1px solid var(--ak-border) !important;
+  color: var(--ak-text) !important;
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+.popover-content {
+  background: var(--ak-surface) !important;
+  color: var(--ak-text) !important;
+  max-height: 400px !important;
+  overflow-y: auto !important;
+}
+
+.popover-content pre {
+  background: var(--ak-code-bg) !important;
+  color: var(--ak-code-text) !important;
+  border: none !important;
+}
+
+.popover-content pre code {
+  background: transparent !important;
+  color: var(--ak-code-text) !important;
+}
+
+.popover > .arrow::after {
+  border-bottom-color: var(--ak-surface) !important;
+  border-top-color: var(--ak-surface) !important;
+}
+
+/* Tutorial exercise solution/hint clip panel */
+.tutorial-exercise-output .alert,
+.alert {
+  background: var(--ak-surface-raised) !important;
+  border: 1px solid var(--ak-border) !important;
+  color: var(--ak-text) !important;
+  border-radius: var(--ak-radius) !important;
+}
+
+.alert-info {
+  background: var(--ak-accent-dim) !important;
+  border-color: rgba(88, 166, 255, 0.3) !important;
+  color: var(--ak-text) !important;
+}
+
+/* btn-default used in various learnr UI */
+.btn-default {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  color: var(--ak-text-secondary) !important;
+  border-radius: 6px !important;
+}
+
+.btn-default:hover,
+.btn-default:focus {
+  background: var(--ak-surface-raised) !important;
+  border-color: var(--ak-border-light) !important;
+  color: var(--ak-text) !important;
+}
+
+/* Dropdown menus */
+.dropdown-menu {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dropdown-menu > li > a {
+  color: var(--ak-text) !important;
+}
+
+.dropdown-menu > li > a:hover {
+  background: var(--ak-surface-raised) !important;
+  color: var(--ak-accent) !important;
+}
+
+/* Form controls */
+.form-control {
+  background: var(--ak-surface) !important;
+  border: 1px solid var(--ak-border) !important;
+  color: var(--ak-text) !important;
+}
+
+.form-control:focus {
+  border-color: var(--ak-accent) !important;
+  box-shadow: 0 0 0 2px var(--ak-accent-dim) !important;
+}

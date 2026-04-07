@@ -1,0 +1,318 @@
+---
+title: "Tutorial 3: Regression Analysis"
+subtitle: "assemblykor - Korean National Assembly Data for Political Science Education"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(assemblykor)
+library(dplyr)
+library(ggplot2)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 7, fig.height = 4)
+data(legislators)
+data(wealth)
+data(seminars)
+set_ko_font()
+
+# Pre-build merged dataset
+df <- legislators %>%
+  filter(assembly == 22) %>%
+  inner_join(wealth %>% filter(year == 2024), by = "member_id") %>%
+  mutate(log_nw = log(pmax(net_worth, 1)))
+
+df_3party <- df %>%
+  filter(party %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9"))
+
+tutorial_options(exercise.eval = FALSE)
+```
+
+```{r theme, echo=FALSE}
+htmltools::includeCSS(
+  system.file("tutorials/css/assemblykor.css", package = "assemblykor")
+)
+```
+
+## Learning Objectives
+
+**Research Question**: Does legislator wealth affect legislative activity?
+
+You will learn:
+
+- Running OLS regression with `lm()` and reading output
+- The role of control variables (omitted variable bias)
+- Log transformation for skewed variables
+- Interaction terms
+- Visualizing regression results (coefficient plot)
+
+## 1. What Is Regression?
+
+**Core idea**: "When X changes by one unit, how much does Y change on average?"
+
+$$Y = \beta_0 + \beta_1 X + \epsilon$$
+
+- $\beta_0$ (intercept): predicted Y when X = 0
+- $\beta_1$ (slope): average change in Y per unit change in X
+- $\epsilon$ (error): unexplained variation
+
+## 2. Data Preparation
+
+```{r prep, exercise=TRUE}
+df <- legislators %>%
+  filter(assembly == 22) %>%
+  inner_join(wealth %>% filter(year == 2024), by = "member_id")
+
+cat("Sample size:", nrow(df), "legislators\n")
+```
+
+### Visual: Scatter with Regression Line
+
+```{r ols-visual, exercise=TRUE, fig.height=4}
+ggplot(df, aes(x = net_worth / 1e6, y = n_bills_lead)) +
+  geom_point(alpha = 0.4, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red", se = TRUE) +
+  labs(x = "Net Worth (billion KRW)", y = "Lead-sponsored Bills",
+       title = "Net Worth and Legislative Activity",
+       subtitle = "Red line = regression line, gray = 95% CI") +
+  theme_minimal()
+```
+
+## 3. Simple Regression
+
+```{r simple-ols, exercise=TRUE}
+m1 <- lm(n_bills_lead ~ net_worth, data = df)
+summary(m1)
+```
+
+### Reading the Output
+
+| Item | Location | Meaning |
+|------|----------|---------|
+| `Estimate` | Coefficients | Estimated $\hat{\beta}$ |
+| `Std. Error` | Coefficients | Uncertainty of estimate |
+| `Pr(>|t|)` | Coefficients | p-value (<0.05 = significant) |
+| `R-squared` | Bottom | Proportion of variance explained |
+
+> **About p-values**: A small p-value means the relationship is unlikely due to chance, NOT that the effect is large. Coefficient magnitude and statistical significance are separate things.
+
+```{r quiz-interpret, echo=FALSE}
+quiz(
+  question("Why is the net_worth coefficient extremely small?",
+    answer("The sample size is too small for reliable estimation"),
+    answer("The variable is in thousands of KRW, making the numbers huge", correct = TRUE),
+    answer("Too many missing values are biasing the coefficient"),
+    answer("The dependent variable is a count, not truly continuous"),
+    correct = "Correct! Converting to billions makes interpretation easier."
+  )
+)
+```
+
+## 4. Log Transformation
+
+Wealth data is typically right-skewed. Log transformation helps.
+
+```{r log-model, exercise=TRUE}
+df <- df %>%
+  mutate(log_nw = log(pmax(net_worth, 1)))
+
+m2 <- lm(n_bills_lead ~ log_nw, data = df)
+summary(m2)
+```
+
+> **Interpretation**: In a log-linear model, when log(X) increases by 1 (X roughly triples), Y changes by $\beta$.
+
+## 5. Multiple Regression: Adding Controls
+
+Simple regression limitation: Is it wealth causing more bills, or do wealthier legislators also happen to be more senior?
+
+**Multiple regression** estimates the **independent effect** of each variable.
+
+```{r multiple, exercise=TRUE}
+m3 <- lm(n_bills_lead ~ log_nw + gender + seniority + district_type, data = df)
+summary(m3)
+```
+
+### Coefficient Comparison
+
+```{r coef-compare, exercise=TRUE}
+m2 <- lm(n_bills_lead ~ log_nw, data = df)
+m3 <- lm(n_bills_lead ~ log_nw + gender + seniority + district_type, data = df)
+
+data.frame(
+  Model = c("Bivariate (M2)", "With Controls (M3)"),
+  log_nw_coef = c(round(coef(m2)["log_nw"], 3), round(coef(m3)["log_nw"], 3)),
+  R_squared = c(round(summary(m2)$r.squared, 3), round(summary(m3)$r.squared, 3))
+)
+```
+
+If the coefficient shrinks after adding controls, part of the original effect was due to **confounding**.
+
+```{r quiz-controls, echo=FALSE}
+quiz(
+  question("The wealth coefficient shrinks after adding seniority as a control. What does this suggest?",
+    answer("Seniority is the direct cause of higher wealth levels"),
+    answer("Seniority was confounding the wealth-bills relationship", correct = TRUE),
+    answer("The model is now overfitting with too many variables"),
+    answer("Wealth has no real effect on legislative activity"),
+    correct = "Correct! Seniority is correlated with both wealth and bills, so omitting it inflated the wealth coefficient (omitted variable bias)."
+  )
+)
+```
+
+## 6. Categorical Variables
+
+```{r categorical, exercise=TRUE}
+df_3party <- df %>%
+  filter(party %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9"))
+
+m4 <- lm(n_bills_lead ~ log_nw + gender + seniority + district_type + party,
+         data = df_3party)
+summary(m4)
+```
+
+R automatically creates dummy variables. One category becomes the **reference**. Use `relevel()` to change it.
+
+## 7. Interaction Terms
+
+Does the wealth effect differ by gender?
+
+```{r interaction, exercise=TRUE}
+m5 <- lm(n_bills_lead ~ log_nw * gender + seniority + district_type, data = df)
+summary(m5)
+```
+
+```{r interaction-plot, exercise=TRUE, fig.height=4}
+ggplot(df, aes(x = log_nw, y = n_bills_lead, color = gender)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  scale_color_manual(values = c("F" = "#E66101", "M" = "#5E3C99"),
+                     labels = c("Female", "Male")) +
+  labs(x = "log(Net Worth)", y = "Lead Bills", color = "Gender",
+       title = "Wealth and Bills: Gender Interaction") +
+  theme_minimal()
+```
+
+Different slopes indicate an interaction effect.
+
+## 8. Coefficient Plot
+
+Visualizing regression results is more intuitive than reading tables.
+
+```{r coef-plot, exercise=TRUE, fig.height=4}
+m3 <- lm(n_bills_lead ~ log_nw + gender + seniority + district_type, data = df)
+
+coef_df <- broom::tidy(m3, conf.int = TRUE) %>%
+  filter(term != "(Intercept)")
+
+ggplot(coef_df, aes(x = estimate, y = reorder(term, estimate))) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high),
+                  color = "steelblue", size = 0.8) +
+  labs(x = "Coefficient (95% CI)", y = NULL,
+       title = "Determinants of Bill Lead-Sponsorship") +
+  theme_minimal(base_size = 13)
+```
+
+- CI crossing 0 = not significant
+- Left of 0 = negative effect, right = positive effect
+
+## 9. Model Diagnostics
+
+```{r diagnostics, exercise=TRUE, fig.height=6}
+m3 <- lm(n_bills_lead ~ log_nw + gender + seniority + district_type, data = df)
+par(mfrow = c(2, 2))
+plot(m3)
+```
+
+| Plot | Checks | Good Sign |
+|------|--------|-----------|
+| Residuals vs Fitted | Homoscedasticity | No pattern |
+| Q-Q Plot | Normality | Points on diagonal |
+| Scale-Location | Homoscedasticity | Horizontal line |
+| Residuals vs Leverage | Influential points | No extreme outliers |
+
+## 10. Results Summary
+
+```{r results-table, exercise=TRUE}
+m1 <- lm(n_bills_lead ~ net_worth, data = df)
+m2 <- lm(n_bills_lead ~ log_nw, data = df)
+m3 <- lm(n_bills_lead ~ log_nw + gender + seniority + district_type, data = df)
+
+models <- list(m1, m2, m3)
+data.frame(
+  Model = c("M1: Raw Scale", "M2: Log", "M3: + Controls"),
+  Coef = sapply(models, \(m) round(coef(m)[2], 4)),
+  p = sapply(models, \(m) round(summary(m)$coef[2, 4], 4)),
+  R2 = sapply(models, \(m) round(summary(m)$r.squared, 3)),
+  N = sapply(models, \(m) nobs(m))
+)
+```
+
+## Exercises
+
+### Exercise 1: Real Estate
+
+Use `real_estate` as the predictor instead of `net_worth`. Compare results.
+
+```{r ex1, exercise=TRUE}
+
+```
+
+```{r ex1-solution}
+m_re <- lm(n_bills_lead ~ real_estate, data = df)
+m_nw <- lm(n_bills_lead ~ net_worth, data = df)
+summary(m_re)
+```
+
+### Exercise 2: Gangnam Property
+
+Add `has_gangnam_property` as a control variable. Is it significant?
+
+```{r ex2, exercise=TRUE}
+
+```
+
+```{r ex2-solution}
+m_gangnam <- lm(n_bills_lead ~ log_nw + has_gangnam_property + gender +
+                  seniority + district_type, data = df)
+summary(m_gangnam)
+```
+
+### Exercise 3: Seminar Analysis with Coefficient Plot
+
+Analyze whether seminar count (`n_seminars`) affects cross-party ratio. Control for governing status and seniority. Visualize with a coefficient plot.
+
+```{r ex3, exercise=TRUE}
+
+```
+
+```{r ex3-solution}
+data(seminars)
+m_sem <- lm(cross_party_ratio ~ n_seminars + is_governing + seniority,
+            data = seminars)
+
+broom::tidy(m_sem, conf.int = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  ggplot(aes(x = estimate, y = reorder(term, estimate))) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high), color = "steelblue") +
+  labs(x = "Coefficient (95% CI)", y = NULL,
+       title = "Determinants of Cross-party Cooperation") +
+  theme_minimal()
+```
+
+### Exercise 4: Log-Log Model
+
+Estimate a log-log model and interpret the coefficient as **elasticity**.
+
+```{r ex4, exercise=TRUE}
+
+```
+
+```{r ex4-solution}
+df_pos <- df %>% filter(n_bills_lead > 0, net_worth > 0)
+m_loglog <- lm(log(n_bills_lead) ~ log(net_worth), data = df_pos)
+summary(m_loglog)
+# Interpretation: 1% increase in net worth -> beta% change in bills
+```

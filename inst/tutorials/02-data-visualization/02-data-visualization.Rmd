@@ -1,0 +1,330 @@
+---
+title: "Tutorial 2: Data Visualization with ggplot2"
+subtitle: "assemblykor - Korean National Assembly Data for Political Science Education"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(assemblykor)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 7, fig.height = 4)
+data(legislators)
+data(bills)
+data(wealth)
+data(seminars)
+set_ko_font()
+tutorial_options(exercise.eval = FALSE)
+```
+
+```{r theme, echo=FALSE}
+htmltools::includeCSS(
+  system.file("tutorials/css/assemblykor.css", package = "assemblykor")
+)
+```
+
+## Learning Objectives
+
+**Research Question**: Visualizing the Korean National Assembly - who does what?
+
+You will learn:
+
+- The ggplot2 grammar: **data + mapping(aes) + geometry(geom)**
+- 6 core chart types: bar, histogram, boxplot, scatter, line, facet
+- Polishing graphs for clear communication
+
+## 1. ggplot2 Basics
+
+Every ggplot starts with three elements:
+
+1. **Data**: which data frame?
+2. **Mapping** (`aes`): which variables map to x, y, color?
+3. **Geometry** (`geom_*`): points, lines, bars?
+
+Layers are added with `+`.
+
+## 2. Bar Charts: Category Comparison
+
+```{r bar-basic, exercise=TRUE, fig.height=4}
+legislators %>%
+  filter(assembly == 22) %>%
+  count(party) %>%
+  filter(n >= 3) %>%
+  ggplot(aes(x = reorder(party, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(x = NULL, y = "Seats", title = "22nd Assembly Party Seats")
+```
+
+### Stacked Bars: Proportion Comparison
+
+```{r bar-stacked, exercise=TRUE, fig.height=4}
+legislators %>%
+  filter(assembly == 22,
+         party %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9")) %>%
+  count(party, gender) %>%
+  ggplot(aes(x = party, y = n, fill = gender)) +
+  geom_col(position = "fill") +
+  scale_fill_manual(values = c("F" = "#E66101", "M" = "#5E3C99"),
+                    labels = c("Female", "Male")) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = NULL, y = "Proportion", fill = "Gender",
+       title = "Gender Composition of Major Parties (22nd)") +
+  theme_minimal()
+```
+
+Try changing `"fill"` to `"dodge"` or `"stack"` in the code above and see how the chart changes.
+
+```{r quiz-bar, echo=FALSE}
+quiz(
+  question("Party A has 80 men and 20 women. Party B has 20 men and 5 women. With position = 'fill', which party looks like it has a higher female proportion?",
+    answer("Party A, because it has more women (20 > 5)"),
+    answer("Party B, because 5/25 = 20% > 20/100 = 20%"),
+    answer("They look equal, because both have 20% female", correct = TRUE),
+    answer("Cannot tell without seeing the raw numbers"),
+    correct = "Correct! 'fill' normalizes to 100%, so both bars show the same 20% female proportion regardless of total size."
+  )
+)
+```
+
+## 3. Histograms: Distribution
+
+```{r hist-basic, exercise=TRUE, fig.height=4}
+ggplot(wealth, aes(x = net_worth / 1e6)) +
+  geom_histogram(bins = 50, fill = "coral", color = "white") +
+  labs(x = "Net Worth (billion KRW)", y = "Count",
+       title = "Legislator Net Worth Distribution") +
+  theme_minimal()
+```
+
+### Log Scale for Skewed Data
+
+```{r hist-log, exercise=TRUE, fig.height=4}
+wealth %>%
+  filter(net_worth > 0) %>%
+  ggplot(aes(x = net_worth / 1e6)) +
+  geom_histogram(bins = 40, fill = "darkgreen", color = "white") +
+  scale_x_log10(labels = scales::comma) +
+  labs(x = "Net Worth (billion KRW, log scale)", y = "Count",
+       title = "Net Worth Distribution (Log Scale)") +
+  theme_minimal()
+```
+
+### Density Curves: Group Comparison
+
+```{r density-compare, exercise=TRUE, fig.height=4}
+wealth %>%
+  filter(net_worth > 0) %>%
+  mutate(gangnam = ifelse(has_gangnam_property, "Gangnam Owner", "Non-owner")) %>%
+  ggplot(aes(x = net_worth / 1e6, fill = gangnam)) +
+  geom_density(alpha = 0.5) +
+  scale_x_log10(labels = scales::comma) +
+  scale_fill_manual(values = c("Gangnam Owner" = "#D95F02", "Non-owner" = "#7570B3")) +
+  labs(x = "Net Worth (billion KRW, log scale)", y = "Density",
+       fill = NULL,
+       title = "Net Worth by Gangnam Property Ownership") +
+  theme_minimal()
+```
+
+## 4. Boxplots: Group Comparison
+
+```{r boxplot-seniority, exercise=TRUE, fig.height=4}
+leg_w <- legislators %>%
+  filter(assembly == 22) %>%
+  inner_join(wealth %>% filter(year == 2024), by = "member_id")
+
+ggplot(leg_w, aes(x = factor(seniority), y = net_worth / 1e6)) +
+  geom_boxplot(fill = "lightblue", outlier.alpha = 0.3) +
+  labs(x = "Seniority (terms)", y = "Net Worth (billion KRW)",
+       title = "Net Worth by Seniority (22nd Assembly)") +
+  theme_minimal()
+```
+
+## 5. Scatter Plots: Relationships
+
+```{r scatter-groups, exercise=TRUE, fig.height=4}
+legislators %>%
+  filter(assembly == 22) %>%
+  ggplot(aes(x = seniority, y = n_bills_lead, color = gender)) +
+  geom_jitter(width = 0.2, alpha = 0.5, size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+  scale_color_manual(values = c("F" = "#E66101", "M" = "#5E3C99"),
+                     labels = c("Female", "Male")) +
+  labs(x = "Seniority", y = "Lead-sponsored Bills",
+       color = "Gender",
+       title = "Seniority and Legislative Productivity (22nd)") +
+  theme_minimal()
+```
+
+`geom_jitter()` adds slight random displacement to overlapping points. `geom_smooth(method = "lm")` adds a trend line.
+
+## 6. Line Charts: Trends Over Time
+
+```{r line-bills, exercise=TRUE, fig.height=4}
+bills %>%
+  mutate(month = as.Date(format(propose_date, "%Y-%m-01"))) %>%
+  count(month) %>%
+  filter(!is.na(month)) %>%
+  ggplot(aes(x = month, y = n)) +
+  geom_line(color = "steelblue", linewidth = 0.8) +
+  labs(x = NULL, y = "Monthly Bills Proposed",
+       title = "Monthly Bill Proposals (20th-22nd)") +
+  theme_minimal()
+```
+
+### Government vs Opposition: Cross-party Cooperation
+
+```{r line-seminar, exercise=TRUE, fig.height=4}
+seminars %>%
+  filter(year >= 2016) %>%
+  group_by(year, is_governing) %>%
+  summarise(avg_cross = mean(cross_party_ratio, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(status = ifelse(is_governing, "Government", "Opposition")) %>%
+  ggplot(aes(x = year, y = avg_cross, color = status)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  scale_color_manual(values = c("Government" = "tomato", "Opposition" = "dodgerblue")) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Year", y = "Cross-party Seminar Ratio", color = NULL,
+       title = "Government vs Opposition Cross-party Cooperation") +
+  theme_minimal()
+```
+
+## 7. facet_wrap(): Side-by-side Comparison
+
+```{r facet-bills, exercise=TRUE, fig.height=4}
+legislators %>%
+  ggplot(aes(x = n_bills_lead)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  facet_wrap(~ assembly, ncol = 3) +
+  labs(x = "Lead-sponsored Bills", y = "Count",
+       title = "Bill Distribution by Assembly") +
+  theme_minimal()
+```
+
+## 8. Polishing: From Basic to Finished
+
+### Step 1: Bare Minimum
+
+```{r polish-1, exercise=TRUE, fig.height=4}
+df_party <- legislators %>%
+  filter(assembly == 22,
+         party %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9")) %>%
+  group_by(party) %>%
+  summarise(median_bills = median(n_bills_lead))
+
+ggplot(df_party, aes(x = party, y = median_bills)) +
+  geom_col()
+```
+
+### Step 2: Add Colors, Labels, and Values
+
+```{r polish-2, exercise=TRUE, fig.height=4}
+party_colors <- c(
+  "\uad6d\ubbfc\uc758\ud798" = "#E61E2B",
+  "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9" = "#004EA2",
+  "\uc870\uad6d\ud601\uc2e0\ub2f9" = "#00B0F0"
+)
+
+df_party <- legislators %>%
+  filter(assembly == 22,
+         party %in% names(party_colors)) %>%
+  group_by(party) %>%
+  summarise(median_bills = median(n_bills_lead))
+
+ggplot(df_party, aes(x = reorder(party, -median_bills),
+                     y = median_bills, fill = party)) +
+  geom_col(show.legend = FALSE, width = 0.6) +
+  geom_text(aes(label = median_bills), vjust = -0.5, size = 4.5) +
+  scale_fill_manual(values = party_colors) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = NULL, y = "Median Lead Bills",
+       title = "Legislative Productivity by Party (22nd)") +
+  theme_minimal(base_size = 13)
+```
+
+## Chart Selection Guide
+
+| Goal | Chart Type | geom |
+|------|-----------|------|
+| Category comparison | Bar chart | `geom_col()` |
+| Distribution | Histogram / density | `geom_histogram()` / `geom_density()` |
+| Group distribution comparison | Boxplot | `geom_boxplot()` |
+| Two-variable relationship | Scatter plot | `geom_point()` / `geom_jitter()` |
+| Trend over time | Line chart | `geom_line()` |
+| Subgroup patterns | Faceting | `facet_wrap()` |
+| Proportion composition | Stacked bar | `geom_col(position = "fill")` |
+
+## Exercises
+
+### Exercise 1: Committee Bill Counts
+
+Plot the top 10 committees by bill count in the 22nd Assembly.
+
+```{r ex1, exercise=TRUE, fig.height=5}
+
+```
+
+```{r ex1-solution, fig.height=5}
+bills %>%
+  filter(assembly == 22) %>%
+  count(committee, sort = TRUE) %>%
+  head(10) %>%
+  ggplot(aes(x = reorder(committee, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(x = NULL, y = "Bills", title = "Top 10 Committees by Bill Count (22nd)") +
+  theme_minimal()
+```
+
+### Exercise 2: Seoul Property Boxplot
+
+Compare real estate assets by Seoul property ownership using a boxplot.
+
+```{r ex2, exercise=TRUE, fig.height=4}
+
+```
+
+```{r ex2-hint}
+# Use wealth data, filter year == 2024
+# x = has_seoul_property, y = real_estate / 1e6
+```
+
+```{r ex2-solution, fig.height=4}
+wealth %>%
+  filter(year == 2024) %>%
+  ggplot(aes(x = has_seoul_property, y = real_estate / 1e6)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.5) +
+  labs(x = "Owns Seoul Property", y = "Real Estate (billion KRW)",
+       title = "Real Estate Assets by Seoul Property Ownership") +
+  theme_minimal()
+```
+
+### Exercise 3: Seminar Scatter
+
+Plot seniority vs seminar count with a trend line.
+
+```{r ex3, exercise=TRUE, fig.height=4}
+
+```
+
+```{r ex3-solution, fig.height=4}
+ggplot(seminars, aes(x = seniority, y = n_seminars)) +
+  geom_jitter(alpha = 0.3, width = 0.2, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red") +
+  labs(x = "Seniority", y = "Seminars",
+       title = "Seniority and Seminar Activity") +
+  theme_minimal()
+```
+
+### Exercise 4: Free Exploration
+
+Choose any visualization technique from this tutorial and find an interesting pattern.
+
+```{r ex4, exercise=TRUE, fig.height=5}
+
+```

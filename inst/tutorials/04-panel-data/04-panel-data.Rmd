@@ -1,0 +1,305 @@
+---
+title: "Tutorial 4: Panel Data and Fixed Effects"
+subtitle: "assemblykor - Korean National Assembly Data for Political Science Education"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(assemblykor)
+library(dplyr)
+library(ggplot2)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 7, fig.height = 4)
+data(wealth)
+data(seminars)
+set_ko_font()
+tutorial_options(exercise.eval = FALSE)
+```
+
+```{r theme, echo=FALSE}
+htmltools::includeCSS(
+  system.file("tutorials/css/assemblykor.css", package = "assemblykor")
+)
+```
+
+## Learning Objectives
+
+**Research Question**: Does becoming the governing party reduce cross-party cooperation?
+
+You will learn:
+
+- Panel data structure (unit x time)
+- Between vs within variation
+- Pooled OLS, individual FE, two-way FE
+- `fixest::feols()` for fixed effects estimation
+- Cluster standard errors
+
+## 1. What Is Panel Data?
+
+**Panel data** observes the same units repeatedly over time. The `wealth` data is a legislator-year panel.
+
+```{r panel-structure, exercise=TRUE}
+cat("Observations:", nrow(wealth), "\n")
+cat("Legislators:", n_distinct(wealth$member_id), "\n")
+cat("Year range:", paste(range(wealth$year), collapse = "-"), "\n")
+
+obs_per_member <- wealth %>% count(member_id) %>% pull(n)
+table(obs_per_member)
+```
+
+Not all legislators are observed the same number of times. This is an **unbalanced panel**.
+
+```{r quiz-panel, echo=FALSE}
+quiz(
+  question("Which of the following is an example of panel data?",
+    answer("Surveying 1,000 different people each year for 5 years"),
+    answer("Tracking the same 200 legislators' wealth annually for 10 years", correct = TRUE),
+    answer("Recording daily stock prices for a single company"),
+    answer("Comparing GDP across 50 countries in 2024"),
+    correct = "Correct! Panel data requires the SAME units observed repeatedly. A new random sample each year is repeated cross-section, not panel."
+  )
+)
+```
+
+## 2. Between vs Within Variation
+
+- **Between**: Rich legislator vs poor legislator (level differences)
+- **Within**: How does the SAME legislator's wealth change over time?
+
+```{r between-within, exercise=TRUE, fig.height=4}
+set.seed(42)
+sample_ids <- wealth %>%
+  count(member_id) %>%
+  filter(n >= 6) %>%
+  slice_sample(n = 5) %>%
+  pull(member_id)
+
+wealth %>%
+  filter(member_id %in% sample_ids) %>%
+  ggplot(aes(x = year, y = net_worth / 1e6, color = name, group = member_id)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  labs(x = "Year", y = "Net Worth (billion KRW)", color = "Legislator",
+       title = "Individual Net Worth Trajectories (5 legislators)") +
+  theme_minimal()
+```
+
+**Fixed effects** uses ONLY within variation: "What changed within the same person?"
+
+## 3. Pooled OLS
+
+Ignoring individual differences:
+
+```{r pooled, exercise=TRUE}
+m_pooled <- lm(deposits ~ real_estate + n_properties, data = wealth)
+summary(m_pooled)
+```
+
+**Problem**: Unobserved individual traits (family background, business ability) can bias estimates. This is **omitted variable bias (OVB)**.
+
+## 4. Individual Fixed Effects
+
+Each legislator gets their own intercept, absorbing all time-invariant personal characteristics.
+
+```{r fe-individual, exercise=TRUE}
+library(fixest)
+m_fe <- feols(deposits ~ real_estate + n_properties | member_id, data = wealth)
+summary(m_fe)
+```
+
+`| member_id` specifies the fixed effect. This estimates the effect of real estate on deposits **within the same legislator**.
+
+### How It Works
+
+1. Calculate each legislator's personal mean
+2. Subtract the mean from all observations (demeaning)
+3. Run OLS on the demeaned data
+
+Result: between-person differences are completely eliminated.
+
+```{r quiz-fe, echo=FALSE}
+quiz(
+  question("A legislator from a wealthy family always has higher deposits. With individual FE, this family background effect is:",
+    answer("Estimated as a separate coefficient in the output"),
+    answer("Absorbed into the individual intercept automatically", correct = TRUE),
+    answer("Included as an additional observable control variable"),
+    answer("Still causing bias in the real estate coefficient"),
+    correct = "Correct! FE absorbs ALL time-invariant traits (family background, innate ability, etc.) into each person's intercept."
+  )
+)
+```
+
+### Pooled OLS vs Fixed Effects
+
+```{r compare-pooled-fe, exercise=TRUE}
+library(fixest)
+m_pooled <- lm(deposits ~ real_estate + n_properties, data = wealth)
+m_fe <- feols(deposits ~ real_estate + n_properties | member_id, data = wealth)
+
+etable(m_pooled, m_fe, headers = c("Pooled OLS", "Individual FE"))
+```
+
+## 5. Two-Way Fixed Effects
+
+Add year FE to control for common time trends (e.g., housing price booms).
+
+```{r twfe, exercise=TRUE}
+library(fixest)
+m_pooled <- lm(deposits ~ real_estate + n_properties, data = wealth)
+m_fe <- feols(deposits ~ real_estate + n_properties | member_id, data = wealth)
+m_twfe <- feols(deposits ~ real_estate + n_properties | member_id + year, data = wealth)
+
+etable(m_pooled, m_fe, m_twfe,
+       headers = c("Pooled", "Individual FE", "Two-way FE"))
+```
+
+```{r quiz-twfe, echo=FALSE}
+quiz(
+  question("In 2021, housing prices surged nationwide, increasing all legislators' real estate values. Which model handles this?",
+    answer("Pooled OLS"),
+    answer("Individual FE only"),
+    answer("Two-way FE (individual + year)", correct = TRUE),
+    answer("None of the above"),
+    correct = "Correct! Year FE absorbs common shocks like a nationwide housing boom that affects everyone equally."
+  )
+)
+```
+
+## 6. DiD with Seminars Data
+
+**Research Question**: Does becoming the governing party reduce cross-party cooperation?
+
+```{r did-prep, exercise=TRUE}
+sem_panel <- seminars %>%
+  filter(n_seminars > 0, year >= 2016)
+
+cat("Observations:", nrow(sem_panel), "\n")
+cat("Legislators:", n_distinct(sem_panel$name), "\n")
+
+switchers <- sem_panel %>%
+  group_by(name) %>%
+  summarise(ever_gov = any(is_governing), ever_opp = any(!is_governing)) %>%
+  summarise(n = sum(ever_gov & ever_opp))
+
+cat("Switchers (experienced both):", switchers$n, "\n")
+```
+
+### DiD Visualization
+
+```{r did-visual, exercise=TRUE, fig.height=4}
+sem_panel <- seminars %>%
+  filter(n_seminars > 0, year >= 2016)
+
+sem_panel %>%
+  group_by(year, is_governing) %>%
+  summarise(mean_cross = mean(cross_party_ratio, na.rm = TRUE), .groups = "drop") %>%
+  mutate(status = ifelse(is_governing, "Government", "Opposition")) %>%
+  ggplot(aes(x = year, y = mean_cross, color = status)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  scale_color_manual(values = c("Government" = "tomato", "Opposition" = "dodgerblue")) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Year", y = "Cross-party Seminar Ratio", color = NULL,
+       title = "Government vs Opposition Cross-party Cooperation") +
+  theme_minimal()
+```
+
+### DiD Estimation
+
+```{r did-estimate, exercise=TRUE}
+library(fixest)
+sem_panel <- seminars %>%
+  filter(n_seminars > 0, year >= 2016)
+
+m_did <- feols(cross_party_ratio ~ is_governing + n_seminars | name + year,
+               data = sem_panel)
+summary(m_did)
+```
+
+### Cluster Standard Errors
+
+Panel data errors may be correlated within units. Cluster SE accounts for this.
+
+```{r cluster-se, exercise=TRUE}
+library(fixest)
+sem_panel <- seminars %>%
+  filter(n_seminars > 0, year >= 2016)
+
+m_did <- feols(cross_party_ratio ~ is_governing + n_seminars | name + year,
+               data = sem_panel)
+summary(m_did, cluster = "name")
+```
+
+## 7. FE Limitations
+
+### Time-invariant variables cannot be estimated
+
+```{r time-invariant, exercise=TRUE}
+library(fixest)
+sem_panel <- seminars %>%
+  filter(n_seminars > 0, year >= 2016)
+
+m_gender <- feols(cross_party_ratio ~ is_governing + is_female | name + year,
+                  data = sem_panel)
+summary(m_gender)
+```
+
+`is_female` is absorbed by the individual FE because it never changes within a person.
+
+## Summary
+
+| Model | Controls For | Limitation |
+|-------|-------------|-----------|
+| Pooled OLS | Only included variables | OVB from unobservables |
+| Individual FE | All time-invariant traits | Can't estimate time-invariant effects |
+| Two-way FE | + Common time shocks | Can't estimate individual time trends |
+| DiD (FE-based) | + Treatment effect | Requires parallel trends assumption |
+
+## Exercises
+
+### Exercise 1: Stocks and Real Estate
+
+Estimate individual FE model: does real estate growth predict stock growth for the same legislator?
+
+```{r ex1, exercise=TRUE}
+
+```
+
+```{r ex1-solution}
+library(fixest)
+m <- feols(stocks ~ real_estate | member_id, data = wealth)
+summary(m)
+```
+
+### Exercise 2: Time-Invariant Problem
+
+What happens when you use `has_seoul_property` with individual FE? Explain why.
+
+```{r ex2, exercise=TRUE}
+
+```
+
+```{r ex2-hint}
+# Check if has_seoul_property changes over time
+wealth %>%
+  group_by(member_id) %>%
+  summarise(changes = n_distinct(has_seoul_property)) %>%
+  count(changes)
+```
+
+### Exercise 3: Three-Model Comparison
+
+Compare Pooled OLS, Individual FE, and Two-way FE using `etable()`. Which is most appropriate?
+
+```{r ex3, exercise=TRUE}
+
+```
+
+```{r ex3-solution}
+library(fixest)
+m1 <- lm(deposits ~ real_estate + stocks, data = wealth)
+m2 <- feols(deposits ~ real_estate + stocks | member_id, data = wealth)
+m3 <- feols(deposits ~ real_estate + stocks | member_id + year, data = wealth)
+etable(m1, m2, m3, headers = c("Pooled", "Individual FE", "Two-way FE"))
+```

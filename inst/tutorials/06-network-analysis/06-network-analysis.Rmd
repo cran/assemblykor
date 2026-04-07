@@ -1,0 +1,508 @@
+---
+title: "Tutorial 6: Co-sponsorship Network Analysis"
+subtitle: "assemblykor - Korean National Assembly Data for Political Science Education"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(assemblykor)
+library(dplyr)
+library(ggplot2)
+library(igraph)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width = 7, fig.height = 6)
+data(legislators)
+data(bills)
+set_ko_font()
+tutorial_options(exercise.eval = FALSE)
+```
+
+```{r theme, echo=FALSE}
+htmltools::includeCSS(
+  system.file("tutorials/css/assemblykor.css", package = "assemblykor")
+)
+```
+
+## Learning Objectives
+
+**Research Question**: Who co-sponsors bills with whom?
+
+Legislators do not propose bills alone. Beyond the lead sponsor, multiple legislators participate as co-sponsors. By constructing a **network (graph)** from these co-sponsorship ties, we can uncover cooperation structures, inter-party relationships, and key figures.
+
+You will learn:
+
+- What is a network: nodes and edges
+- Building a network from co-sponsorship data
+- Centrality measures: who is at the center?
+- Community detection: finding tightly connected groups
+- Network visualization and cross-party analysis
+
+## 1. Network Basics
+
+A network (graph) consists of two elements:
+
+- **Node (vertex)**: unit of analysis. Here, **legislators**
+- **Edge (link)**: relationship between nodes. Here, **co-sponsorship ties**
+
+```{r concept, echo=FALSE, fig.height=3.5}
+g_ex <- graph_from_data_frame(
+  data.frame(from = c("A", "A", "B", "C", "D"),
+             to   = c("B", "C", "C", "D", "E")),
+  directed = FALSE
+)
+set.seed(1)
+plot(g_ex, vertex.size = 30, vertex.color = "lightblue",
+     vertex.label.cex = 1.2, edge.width = 2,
+     main = "Basic Network Structure")
+```
+
+In this figure:
+
+- A, B, C, D, E are **nodes** (5)
+- The lines are **edges** (5)
+- C has 3 edges, giving it the highest **degree centrality**
+
+## 2. Downloading Co-sponsorship Data
+
+```{r download, exercise=TRUE, exercise.eval=FALSE}
+proposers <- get_proposers()
+dim(proposers)
+head(proposers)
+```
+
+## 3. Building an Edge List
+
+To create a network, we need an **edge list**: "who is connected to whom."
+
+For each bill, we link the lead sponsor to each co-sponsor.
+
+```{r edgelist, exercise=TRUE, exercise.eval=FALSE}
+proposers <- get_proposers()
+
+# Restrict to 22nd Assembly bills
+props_22 <- proposers %>%
+  filter(propose_date >= as.Date("2024-05-30"))
+
+# Separate lead sponsors and co-sponsors
+leads <- props_22 %>% filter(is_lead) %>% select(bill_id, lead = member_id)
+cosponsors <- props_22 %>% filter(!is_lead) %>% select(bill_id, cosponsor = member_id)
+
+# Create lead-cosponsor pairs
+edges <- inner_join(leads, cosponsors, by = "bill_id") %>%
+  filter(!is.na(lead), !is.na(cosponsor), lead != cosponsor)
+
+# Edge weight: number of co-sponsored bills
+edge_weights <- edges %>%
+  count(lead, cosponsor, name = "weight")
+
+cat("Nodes (legislators):", n_distinct(c(edge_weights$lead, edge_weights$cosponsor)), "\n")
+cat("Edges (connections):", nrow(edge_weights), "\n")
+cat("Mean weight:", round(mean(edge_weights$weight), 1), "\n")
+```
+
+```{r quiz-network, echo=FALSE}
+quiz(
+  question("Legislators A and B co-sponsored 15 bills together, while A and C co-sponsored 3. In a weighted network, what does this tell us?",
+    answer("A is more central than both B and C in the network"),
+    answer("The A-B edge weight is higher, reflecting stronger collaboration", correct = TRUE),
+    answer("A, B, and C must belong to the same party community"),
+    answer("B has proposed more bills overall than C has"),
+    correct = "Correct! Edge weight captures the strength of the relationship: more co-sponsored bills = stronger tie."
+  )
+)
+```
+
+## 4. Creating an igraph Network
+
+```{r create-graph, exercise=TRUE, exercise.eval=FALSE}
+proposers <- get_proposers()
+
+props_22 <- proposers %>%
+  filter(propose_date >= as.Date("2024-05-30"))
+
+leads <- props_22 %>% filter(is_lead) %>% select(bill_id, lead = member_id)
+cosponsors <- props_22 %>% filter(!is_lead) %>% select(bill_id, cosponsor = member_id)
+
+edge_weights <- inner_join(leads, cosponsors, by = "bill_id") %>%
+  filter(!is.na(lead), !is.na(cosponsor), lead != cosponsor) %>%
+  count(lead, cosponsor, name = "weight")
+
+g <- graph_from_data_frame(edge_weights, directed = FALSE)
+
+# Add legislator metadata
+leg_22 <- legislators %>%
+  filter(assembly == 22) %>%
+  distinct(member_id, .keep_all = TRUE)
+
+V(g)$party  <- leg_22$party[match(V(g)$name, leg_22$member_id)]
+V(g)$gender <- leg_22$gender[match(V(g)$name, leg_22$member_id)]
+V(g)$label  <- leg_22$name[match(V(g)$name, leg_22$member_id)]
+
+cat("Nodes:", vcount(g), "\n")
+cat("Edges:", ecount(g), "\n")
+cat("Density:", round(edge_density(g), 4), "\n")
+```
+
+> **Network density**: the proportion of all possible connections that actually exist. Density = 1 means all nodes are connected; 0 means no connections. Co-sponsorship networks typically have quite high density.
+
+```{r build-network, include=FALSE}
+# Shared setup chunk for exercises in Sections 5-9
+proposers <- get_proposers()
+
+props_22 <- proposers %>%
+  filter(propose_date >= as.Date("2024-05-30"))
+
+leads <- props_22 %>% filter(is_lead) %>% select(bill_id, lead = member_id)
+cosponsors <- props_22 %>% filter(!is_lead) %>% select(bill_id, cosponsor = member_id)
+
+edge_weights <- inner_join(leads, cosponsors, by = "bill_id") %>%
+  filter(!is.na(lead), !is.na(cosponsor), lead != cosponsor) %>%
+  count(lead, cosponsor, name = "weight")
+
+g <- graph_from_data_frame(edge_weights, directed = FALSE)
+
+leg_22 <- legislators %>%
+  filter(assembly == 22) %>%
+  distinct(member_id, .keep_all = TRUE)
+
+V(g)$party  <- leg_22$party[match(V(g)$name, leg_22$member_id)]
+V(g)$gender <- leg_22$gender[match(V(g)$name, leg_22$member_id)]
+V(g)$label  <- leg_22$name[match(V(g)$name, leg_22$member_id)]
+```
+
+## 5. Centrality Measures: Who Is at the Center?
+
+There are multiple ways to define "important nodes" in a network. Each measure captures a different aspect of "importance."
+
+### Degree Centrality
+
+The simplest: **how many other legislators are you connected to?**
+
+```{r degree, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+degree_df <- data.frame(
+  name = V(g)$label,
+  party = V(g)$party,
+  degree = degree(g),
+  stringsAsFactors = FALSE
+) %>% filter(!is.na(name))
+
+degree_df %>% arrange(desc(degree)) %>% head(10)
+```
+
+### Betweenness Centrality
+
+**Who serves as a "bridge" connecting different groups?** Betweenness measures the proportion of shortest paths passing through a node.
+
+```{r betweenness, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+between_df <- data.frame(
+  name = V(g)$label,
+  party = V(g)$party,
+  betweenness = round(betweenness(g, normalized = TRUE), 6),
+  stringsAsFactors = FALSE
+) %>% filter(!is.na(name))
+
+between_df %>% arrange(desc(betweenness)) %>% head(10)
+```
+
+Do those with high degree always have high betweenness? The scatter plot below reveals the answer.
+
+```{r quiz-centrality, echo=FALSE}
+quiz(
+  question("Legislator X has low degree (few connections) but very high betweenness. What does this suggest?",
+    answer("X is not very active in the legislative process overall"),
+    answer("X serves as a rare bridge between otherwise separate groups", correct = TRUE),
+    answer("X is a freshman who has not built connections yet"),
+    answer("The data likely contains an error in X's records"),
+    correct = "Correct! A low-degree but high-betweenness node is a rare but critical bridge, like a cross-party mediator with selective but strategic connections."
+  )
+)
+```
+
+### Centrality Comparison Scatter Plot
+
+```{r centrality-scatter, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network", fig.height=5}
+centrality_df <- data.frame(
+  name = V(g)$label,
+  party = V(g)$party,
+  degree = degree(g),
+  betweenness = betweenness(g, normalized = TRUE),
+  stringsAsFactors = FALSE
+) %>% filter(!is.na(name), !is.na(party))
+
+ggplot(centrality_df, aes(x = degree, y = betweenness)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  labs(x = "Degree Centrality", y = "Betweenness Centrality",
+       title = "Comparing Two Centrality Measures") +
+  theme_minimal()
+```
+
+## 6. Party Network Structure
+
+```{r party-stats, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+centrality_df <- data.frame(
+  name = V(g)$label,
+  party = V(g)$party,
+  degree = degree(g),
+  betweenness = round(betweenness(g, normalized = TRUE), 6),
+  stringsAsFactors = FALSE
+) %>% filter(!is.na(name))
+
+centrality_df %>%
+  filter(party %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9")) %>%
+  group_by(party) %>%
+  summarise(
+    n = n(),
+    avg_degree = round(mean(degree), 1),
+    max_degree = max(degree),
+    avg_betweenness = round(mean(betweenness), 6)
+  )
+```
+
+### Party Degree Distribution
+
+```{r party-boxplot, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network", fig.height=4}
+centrality_df <- data.frame(
+  party = V(g)$party,
+  degree = degree(g),
+  stringsAsFactors = FALSE
+) %>% filter(!is.na(party))
+
+centrality_df %>%
+  filter(party %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9")) %>%
+  ggplot(aes(x = party, y = degree, fill = party)) +
+  geom_boxplot(show.legend = FALSE, alpha = 0.7) +
+  scale_fill_manual(values = c(
+    "\uad6d\ubbfc\uc758\ud798" = "#E61E2B",
+    "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9" = "#004EA2",
+    "\uc870\uad6d\ud601\uc2e0\ub2f9" = "#00B0F0"
+  )) +
+  labs(x = NULL, y = "Degree Centrality",
+       title = "Co-sponsorship Network Degree by Party") +
+  theme_minimal()
+```
+
+## 7. Community Detection
+
+Tightly connected subgroups within a network are called **communities**. Algorithms automatically find them.
+
+### Louvain Algorithm
+
+```{r community, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+comm <- cluster_louvain(g)
+
+cat("Communities found:", max(membership(comm)), "\n")
+cat("Modularity:", round(modularity(comm), 3), "\n")
+
+# Community-party correspondence
+comm_party <- data.frame(
+  community = membership(comm),
+  party = V(g)$party
+) %>% filter(!is.na(party))
+
+table(comm_party$community, comm_party$party) %>%
+  as.data.frame() %>%
+  filter(Freq > 3) %>%
+  arrange(Var1, desc(Freq))
+```
+
+```{r quiz-community, echo=FALSE}
+quiz(
+  question("The algorithm finds 3 communities that map almost perfectly to 3 parties. What does this imply about co-sponsorship behavior?",
+    answer("The algorithm is biased toward detecting party-based clusters"),
+    answer("Most co-sponsorship happens within parties, not across them", correct = TRUE),
+    answer("The assembly has exactly 3 parties with equal-sized caucuses"),
+    answer("Community detection is unreliable for political networks"),
+    correct = "Correct! When detected communities align with parties, it means most collaboration happens within party boundaries, a sign of partisan co-sponsorship."
+  )
+)
+```
+
+> **Modularity**: measures how clearly communities are separated. Close to 0 means no different from random; close to 1 means very distinct communities. Values above 0.3 typically indicate meaningful structure.
+
+## 8. Cross-Party Connections
+
+How much co-sponsorship happens across party lines?
+
+```{r cross-party, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+edge_df <- as_data_frame(g, what = "edges") %>%
+  mutate(
+    party_from = V(g)$party[match(from, V(g)$name)],
+    party_to   = V(g)$party[match(to, V(g)$name)],
+    cross_party = party_from != party_to
+  ) %>%
+  filter(!is.na(party_from), !is.na(party_to))
+
+cat("Total edges:", nrow(edge_df), "\n")
+cat("Cross-party edges:", sum(edge_df$cross_party), "\n")
+cat("Cross-party ratio:", round(mean(edge_df$cross_party) * 100, 1), "%\n")
+```
+
+### Cross-Party Heatmap
+
+Which party pairs co-sponsor the most?
+
+```{r cross-heatmap, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network", fig.height=5}
+edge_df <- as_data_frame(g, what = "edges") %>%
+  mutate(
+    party_from = V(g)$party[match(from, V(g)$name)],
+    party_to   = V(g)$party[match(to, V(g)$name)]
+  ) %>%
+  filter(!is.na(party_from), !is.na(party_to))
+
+party_pair <- edge_df %>%
+  filter(party_from %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9"),
+         party_to %in% c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9", "\uc870\uad6d\ud601\uc2e0\ub2f9")) %>%
+  count(party_from, party_to) %>%
+  mutate(n_log = log10(n + 1))
+
+ggplot(party_pair, aes(x = party_from, y = party_to, fill = n_log)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = scales::comma(n)), size = 4) +
+  scale_fill_gradient(low = "lightyellow", high = "tomato", guide = "none") +
+  labs(x = NULL, y = NULL,
+       title = "Cross-Party Co-sponsorship Counts") +
+  theme_minimal(base_size = 13)
+```
+
+If the diagonal (within-party) is much larger than off-diagonal (cross-party), co-sponsorship mainly occurs within party boundaries.
+
+## 9. Network Visualization
+
+```{r network-viz, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network", fig.height=6}
+# Visualize two main parties only (full network is too complex)
+main_parties <- c("\uad6d\ubbfc\uc758\ud798", "\ub354\ubd88\uc5b4\ubbfc\uc8fc\ub2f9")
+keep <- V(g)$party %in% main_parties & !is.na(V(g)$party)
+g_sub <- induced_subgraph(g, which(keep))
+
+party_colors <- ifelse(V(g_sub)$party == "\uad6d\ubbfc\uc758\ud798", "#E61E2B", "#004EA2")
+
+set.seed(42)
+layout <- layout_with_fr(g_sub)
+
+# Remove weak edges for visual clarity
+g_viz <- delete_edges(g_sub, which(E(g_sub)$weight < 10))
+
+plot(g_viz,
+     vertex.color = party_colors,
+     vertex.size = sqrt(degree(g_viz)) * 0.8,
+     vertex.label = NA,
+     edge.width = E(g_viz)$weight / 50,
+     edge.color = rgb(0, 0, 0, 0.08),
+     layout = layout,
+     main = "22nd Assembly Co-sponsorship Network (PPP vs DPK)")
+
+legend("bottomleft",
+       legend = main_parties,
+       col = c("#E61E2B", "#004EA2"),
+       pch = 19, pt.cex = 1.5, bty = "n")
+```
+
+Are the two parties separated or mixed in the network? This visualization provides an intuitive grasp of cross-party co-sponsorship structure.
+
+## Summary
+
+| Concept | Meaning | Function |
+|---------|---------|----------|
+| Node / Edge | Unit of analysis / Relationship | `graph_from_data_frame()` |
+| Degree centrality | Nodes with many connections | `degree()` |
+| Betweenness centrality | Bridge nodes between groups | `betweenness()` |
+| Community detection | Tightly connected subgroups | `cluster_louvain()` |
+| Modularity | Clarity of community separation | `modularity()` |
+| Cross-party ratio | Inter-party co-sponsorship | Edge attribute comparison |
+
+## Exercises
+
+### Exercise 1: Gender and Network Position
+
+Compare mean betweenness centrality between female and male legislators. Is there a gender difference in network position?
+
+```{r ex1, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+
+```
+
+```{r ex1-hint}
+# g, leg_22, and vertex attributes are already available
+# Use V(g)$gender and betweenness(g, normalized = TRUE)
+# Create a data.frame and group_by(gender)
+```
+
+```{r ex1-solution}
+data.frame(
+  name = V(g)$label,
+  gender = V(g)$gender,
+  betweenness = betweenness(g, normalized = TRUE)
+) %>%
+  filter(!is.na(gender)) %>%
+  group_by(gender) %>%
+  summarise(
+    n = n(),
+    avg_betweenness = round(mean(betweenness), 6),
+    median_betweenness = round(median(betweenness), 6)
+  )
+```
+
+### Exercise 2: Alternative Community Detection
+
+Use `cluster_walktrap()` instead of Louvain and compare the results. How do modularity and the number of communities differ?
+
+```{r ex2, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+
+```
+
+```{r ex2-hint}
+# g is already available from the setup
+# comm_louvain <- cluster_louvain(g)
+# comm_walktrap <- cluster_walktrap(g)
+# Compare max(membership(...)) and modularity(...)
+```
+
+```{r ex2-solution}
+comm_louvain <- cluster_louvain(g)
+comm_walktrap <- cluster_walktrap(g)
+
+data.frame(
+  Algorithm = c("Louvain", "Walktrap"),
+  Communities = c(max(membership(comm_louvain)), max(membership(comm_walktrap))),
+  Modularity = c(round(modularity(comm_louvain), 3), round(modularity(comm_walktrap), 3))
+)
+```
+
+### Exercise 3: 21st vs 22nd Assembly Comparison
+
+Build the 21st Assembly co-sponsorship network and compare with the 22nd. Report at least one of: density, average degree, or cross-party ratio.
+
+```{r ex3, exercise=TRUE, exercise.eval=FALSE, exercise.setup="build-network"}
+
+```
+
+```{r ex3-hint}
+# proposers is already available from the setup
+# Filter for 21st Assembly:
+# propose_date >= "2020-05-30" & propose_date < "2024-05-30"
+# Build a 21st assembly network g_21, then compare with g (22nd)
+```
+
+```{r ex3-solution}
+# 21st Assembly (proposers is available from setup)
+props_21 <- proposers %>%
+  filter(propose_date >= as.Date("2020-05-30"),
+         propose_date < as.Date("2024-05-30"))
+
+leads_21 <- props_21 %>% filter(is_lead) %>% select(bill_id, lead = member_id)
+cos_21 <- props_21 %>% filter(!is_lead) %>% select(bill_id, cosponsor = member_id)
+
+ew_21 <- inner_join(leads_21, cos_21, by = "bill_id") %>%
+  filter(!is.na(lead), !is.na(cosponsor), lead != cosponsor) %>%
+  count(lead, cosponsor, name = "weight")
+
+g_21 <- graph_from_data_frame(ew_21, directed = FALSE)
+
+data.frame(
+  Assembly = c("21st", "22nd"),
+  Nodes = c(vcount(g_21), vcount(g)),
+  Edges = c(ecount(g_21), ecount(g)),
+  Density = c(round(edge_density(g_21), 4), round(edge_density(g), 4)),
+  Avg_Degree = c(round(mean(degree(g_21)), 1), round(mean(degree(g)), 1))
+)
+```
