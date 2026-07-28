@@ -20,7 +20,7 @@ science. Think of it as a Korean politics counterpart to
 The package includes seven built-in datasets covering legislators, bills,
 asset declarations, policy seminars, committee speeches, plenary votes,
 and roll call records, all drawn from public data of the Korean National
-Assembly (2000-2026).
+Assembly (2004-2026).
 
 ## Why tidyverse?
 
@@ -69,7 +69,7 @@ Why tidyverse-first for teaching?
 
 **`wealth`** 2,928 records
 
-의원 재산신고 패널 (순자산, 부동산, 예금, 주식, 13개 시점)
+의원 재산신고 패널 (순자산, 부동산, 예금, 주식, 2015-2024 10개 연도)
 
 </td><td>
 
@@ -180,11 +180,16 @@ Larger datasets are available via download functions (requires the `arrow`
 package):
 
 ```r
-# Bill propose-reason texts (60,925 texts, ~40 MB download)
+# Bill propose-reason texts (60,925 texts, ~25 MB download)
 texts <- get_bill_texts()
 
-# Co-sponsorship records (769,773 rows, ~25 MB download)
+# Co-sponsorship records (769,773 rows, ~6 MB download)
 proposers <- get_proposers()
+
+# Morpheme tokens for speeches (665,055 rows, ~1.3 MB download)
+# Pre-tokenized with the Kiwi morphological analyzer - no Korean NLP
+# setup needed on the student side
+tokens <- get_speech_tokens()
 ```
 
 ## Tutorials (한국어 수업 자료)
@@ -284,7 +289,7 @@ citation("assemblykor")
 
 ```
 Yang, Kyusik (2026). assemblykor: Korean National Assembly Data for
-Political Science Education. R package version 0.1.1.
+Political Science Education. R package version 0.1.3.
 https://CRAN.R-project.org/package=assemblykor
 ```
 

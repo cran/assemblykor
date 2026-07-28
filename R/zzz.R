@@ -5,15 +5,6 @@
   subtitle <- "Korean National Assembly Data for Political Science Education"
   width <- max(nchar(title), nchar(subtitle)) + 2
 
-  top    <- paste0("
-    \n",
-  "
-     \n")
-  bottom <- paste0("
-     \n",
-  "
-    ")
-
   pad_line <- function(text) {
     padding <- width - nchar(text)
     paste0(
@@ -44,6 +35,7 @@
     "  Downloadable:\n",
     "    get_bill_texts()           Bill propose-reason texts\n",
     "    get_proposers()            Co-sponsorship records\n",
+    "    get_speech_tokens()        Morpheme tokens for speeches (Kiwi)\n",
     "\n",
     "  Tutorials:\n",
     "    list_tutorials()           See all 9 tutorials\n",
@@ -52,7 +44,9 @@
     "\n",
     "  Korean font for ggplot2:     set_ko_font()\n",
     "\n",
-    "  https://CRAN.R-project.org/package=assemblykor\n"
+    "  CRAN releases may lag behind. For the latest data and fixes:\n",
+    "    remotes::install_github(\"kyusik-yang/assemblykor\")\n",
+    "    https://github.com/kyusik-yang/assemblykor\n"
   )
 
   packageStartupMessage(msg)
